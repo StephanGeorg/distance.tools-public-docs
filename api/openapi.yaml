@@ -1,0 +1,589 @@
+openapi: 3.0.0
+info:
+  title: Distance API
+  description: API for calculating distances between multiple points
+  version: 2.0.0
+servers:
+  - url: https://api.distance.tools/api/v2
+security:
+  - XBillingToken: []
+paths:
+  /distance/route:
+    post:
+      summary: Car routing and airline distance
+      description: Calculate airline and car routing distances between multiple points.
+      parameters:
+        - in: query
+          name: car
+          schema:
+            type: boolean
+          description: Get car routing distances
+          required: false
+        - in: query
+          name: flight
+          schema:
+            type: boolean
+          description: Get flight distances
+          required: false
+        - in: query
+          name: equal
+          schema:
+            type: boolean
+          description: Get equal distances
+          required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - route
+              properties:
+                route:
+                  type: array
+                  minItems: 2
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        description: Any input text or lat,lng
+                        required: true
+                      country:
+                        type: string
+                        description: ISO 3166-1 alpha-3 country code
+                        nullable: true
+      responses:
+        "200":
+          description: Valid request and found waypoints
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - route
+                properties:
+                  route:
+                    type: object
+                    properties:
+                      vincenty:
+                        type: number
+                        description: Airline distance in KM calculated with Vincenty's formulae
+                      haversine:
+                        type: number
+                        description: Airline distance in KM calculated with Haversine formula
+                      greatCircle:
+                        type: number
+                        description: Airline distance in KM calculated with Great Circle formula
+                      car:
+                        type: object
+                        properties:
+                          distance:
+                            type: number
+                            description: Car routing distance in KM
+                          duration:
+                            type: number
+                            description: Car routing duration in Sec
+                          status:
+                            type: string
+                            description: Flag indicating route was found
+                  steps:
+                    type: array
+                    description: Routing steps
+                  points:
+                    type: array
+                    description: Routing points
+        "400":
+          description: Bad Request - Invalid request
+        "404":
+          description: Not Found - Valid request but waypoints not found
+  /distance/route/detailed:
+    post:
+      summary: Detailed car routing and airline distance
+      description: Calculate car routing distances with detailed country breakdown.
+      parameters:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - route
+              properties:
+                route:
+                  type: array
+                  minItems: 2
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        description: Any input text or lat,lng
+                      country:
+                        type: string
+                        description: ISO 3166-1 alpha-3 country code
+                        nullable: true
+      responses:
+        "200":
+          description: Valid request and all waypoints found
+        "400":
+          description: Bad Request - Invalid request
+        "404":
+          description: Not Found - Valid request but not all waypoints were found
+  /distance/route/maritime:
+    post:
+      summary: Maritime route and airline distance
+      description: Get maritime route distances. Points will be matched to the nearest sea route vertex.
+      parameters:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - route
+              properties:
+                route:
+                  type: array
+                  minItems: 2
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        description: Any input text or lat,lng
+                      country:
+                        type: string
+                        description: ISO 3166-1 alpha-3 country code
+                        nullable: true
+      responses:
+        "200":
+          description: Valid request and found waypoints
+        "400":
+          description: Bad Request - Invalid request
+        "404":
+          description: Not Found - Valid request but not all waypoints were found
+  /distance/point:
+    post:
+      summary: Get point information
+      description: Get geocoding and information about a geographical point.
+      parameters:
+        - in: query
+          name: airports
+          schema:
+            type: boolean
+          description: Get nearby airports
+        - in: query
+          name: cities
+          schema:
+            type: boolean
+          description: Get nearby cities
+        - in: query
+          name: furthest
+          schema:
+            type: boolean
+          description: Get furthest cities
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - point
+              properties:
+                point:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      description: Any input text or lat,lng
+                    country:
+                      type: string
+                      description: ISO 3166-1 alpha-3 country code
+                      nullable: true
+      responses:
+        "200":
+          description: Valid request and point found
+        "400":
+          description: Bad Request - Invalid request
+        "404":
+          description: Not Found - Valid request but location not found
+  /route/car:
+    post:
+      summary: Get car routing information
+      description: Get high-performance car route calculations
+      parameters:
+        - in: query
+          name: alternatives
+          schema:
+            type: boolean
+            default: false
+          description: Search for alternative routes and return as well.
+        - in: query
+          name: geometries
+          schema:
+            type: string
+            enum:
+              - polyline
+              - polyline6
+              - geojson
+            default: polyline
+          description: Returned route geometry format (influences overview and per step)
+        - in: query
+          name: overview
+          schema:
+            type: string
+            enum:
+              - full
+              - simplified
+              - false
+            default: simplified
+          description: Add overview geometry either full, simplified according to highest zoom level it could be display on, or not at all
+        - in: query
+          name: steps
+          schema:
+            type: boolean
+            default: false
+          description: Return route steps for each route leg
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - route
+              properties:
+                route:
+                  type: array
+                  minItems: 2
+                  maxItems: 75
+                  items:
+                    type: object
+                    required:
+                      - lat
+                      - lng
+                    properties:
+                      lat:
+                        type: number
+                        format: double
+                        description: Latitude coordinate
+                        minimum: -90
+                        maximum: 90
+                      lng:
+                        type: number
+                        format: double
+                        description: Longitude coordinate
+                        minimum: -180
+                        maximum: 180
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteResponse'
+        "400":
+          description: Bad Request - Invalid request
+        "404":
+          description: Not Found - Valid request but location not found
+  /route/maritime:
+    post:
+      summary: Get maritime sea routes
+      description: Calculate maritime sea routes between ports or coordinates.
+      parameters:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - route
+              properties:
+                route:
+                  type: array
+                  minItems: 2
+                  maxItems: 2
+                  items:
+                    type: object
+                    required:
+                      - lat
+                      - lng
+                    properties:
+                      lat:
+                        type: number
+                        format: double
+                        description: Latitude coordinate
+                        minimum: -90
+                        maximum: 90
+                      lng:
+                        type: number
+                        format: double
+                        description: Longitude coordinate
+                        minimum: -180
+                        maximum: 180
+      responses:
+        "200":
+          description: Valid request and route was found
+        "400":
+          description: Bad Request - Invalid request
+        "404":
+          description: Not Found - Valid request but location not found
+components:
+  securitySchemes:
+    XBillingToken:
+      type: apiKey
+      in: header
+      name: X-Billing-Token
+      required: true
+      description: Authentication token for billing. Get your token at https://developers.distance.tools.
+  schemas:
+    ApiResponse:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          enum:
+            - Ok
+            - InvalidUrl
+            - InvalidService
+            - InvalidVersion
+            - InvalidOptions
+            - InvalidQuery
+            - InvalidValue
+            - NoSegment
+            - TooBig
+            - NoRoute
+            - NoTable
+            - NotImplemented
+            - NoTrips
+        message:
+          type: string
+        data_version:
+          type: string
+          format: date-time
+    RouteResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            waypoints:
+              type: array
+              items:
+                $ref: '#/components/schemas/Waypoint'
+            routes:
+              type: array
+              items:
+                $ref: '#/components/schemas/Route'
+    TripResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            waypoints:
+              type: array
+              items:
+                $ref: '#/components/schemas/TripWaypoint'
+            trips:
+              type: array
+              items:
+                $ref: '#/components/schemas/Route'
+    Route:
+      type: object
+      properties:
+        distance:
+          type: number
+          format: float
+          description: The distance traveled by the route, in float meters.
+        duration:
+          type: number
+          format: float
+          description: The estimated travel time, in float number of seconds.
+        geometry:
+          type: object
+        weight:
+          type: number
+          format: float
+        weight_name:
+          type: string
+        legs:
+          type: array
+          items:
+            $ref: '#/components/schemas/RouteLeg'
+    RouteLeg:
+      type: object
+      properties:
+        distance:
+          type: number
+          format: float
+          description: The distance traveled by the route, in float meters.
+        duration:
+          type: number
+          format: float
+          description: The estimated travel time, in float number of seconds.
+        weight:
+          type: number
+          format: float
+        summary:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/RouteStep'
+        annotation:
+          $ref: '#/components/schemas/Annotation'
+    RouteStep:
+      type: object
+      properties:
+        distance:
+          type: number
+          format: float
+          description: The distance traveled by the route, in float meters.
+        duration:
+          type: number
+          format: float
+          description: The estimated travel time, in float number of seconds.
+        geometry:
+          type: object
+        weight:
+          type: number
+          format: float
+        name:
+          type: string
+        ref:
+          type: string
+        pronunciation:
+          type: string
+        destinations:
+          type: object
+        exits:
+          type: object
+        mode:
+          type: string
+        maneuver:
+          $ref: '#/components/schemas/StepManeuver'
+        intersections:
+          type: array
+          items:
+            $ref: '#/components/schemas/Intersection'
+        rotary_name:
+          type: string
+        rotary_pronunciation:
+          type: string
+        driving_side:
+          type: string
+          enum:
+            - left
+            - right
+    Annotation:
+      type: object
+      properties:
+        distance:
+          type: array
+          items:
+            type: integer
+          description: The distance, in metres, between each pair of coordinates
+        duration:
+          type: array
+          items:
+            type: integer
+          description: The duration between each pair of coordinates, in seconds
+        datasources:
+          type: array
+          items:
+            type: integer
+        nodes:
+          type: array
+          items:
+            type: integer
+        weight:
+          type: array
+          items:
+            type: integer
+        speed:
+          type: array
+          items:
+            type: number
+            format: float
+        metadata:
+          type: object
+          properties:
+            datasource_names:
+              type: array
+              items:
+                type: string
+    StepManeuver:
+      type: object
+      properties:
+        location:
+          type: array
+          items:
+            type: number
+            format: float
+        bearing_before:
+          type: integer
+        bearing_after:
+          type: integer
+        type:
+          type: string
+        modifier:
+          type: string
+        exit:
+          type: integer
+    Intersection:
+      type: object
+      properties:
+        location:
+          type: array
+          items:
+            type: number
+            format: float
+        bearings:
+          type: array
+          items:
+            type: integer
+        classes:
+          type: array
+          items:
+            type: string
+        entry:
+          type: array
+          items:
+            type: bool
+        in:
+          type: integer
+        out:
+          type: integer
+        lanes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Lane'
+    Lane:
+      type: object
+      properties:
+        indications:
+          type: array
+          items:
+            type: string
+        valid:
+          type: boolean
+    Waypoint:
+      type: object
+      properties:
+        name:
+          type: string
+        location:
+          type: array
+          items:
+            type: number
+            format: float
+        distance:
+          type: number
+          format: float
+        hint:
+          type: string
